@@ -2,8 +2,8 @@ package com.spotify.annoy;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.*;
 
@@ -14,10 +14,9 @@ public class ANNIndex implements AnnoyIndex {
 
   private int dimension, minLeafSize, nodeSize;
   private ArrayList<Integer> roots;
-  private MappedByteBuffer annBuf;
+  private ByteBuffer annBuf;
   private final int kNodeHeaderSize = 12;
   private final int kFloatSize = 4;
-  private RandomAccessFile memoryMappedFile;
 
   private final float[] zeros;
 
@@ -43,14 +42,22 @@ public class ANNIndex implements AnnoyIndex {
   }
 
   private void load(final String filename) throws IOException {
-    memoryMappedFile = new RandomAccessFile(filename, "r");
-    int fileSize = (int) memoryMappedFile.length();
+    RandomAccessFile inFile = new RandomAccessFile(filename, "r");
+    FileChannel inChannel = inFile.getChannel();
+
+    int fileSize = (int) inFile.length();
     System.err.printf("%s: %d bytes\n", filename, fileSize);
 
     // We only support indexes <4GB as a result of ByteBuffer using an int index
-    annBuf = memoryMappedFile.getChannel().map(
-            FileChannel.MapMode.READ_ONLY, 0, fileSize);
+    annBuf = ByteBuffer.allocate(fileSize);
     annBuf.order(ByteOrder.LITTLE_ENDIAN);
+
+    // http://howtodoinjava.com/java-7/nio/3-ways-to-read-files-using-java-nio/
+    inChannel.read(annBuf);
+    annBuf.flip();
+
+    inChannel.close();
+    inFile.close();
 
     // an Angular::node contains:
     // 4   int n_descendants
@@ -122,29 +129,6 @@ public class ANNIndex implements AnnoyIndex {
    */
   public static float cosineDist(final float[] u, final float[] v) {
     return 1.0f - cosineMargin(u, v);
-  }
-
-  /**
-   * Closes this stream and releases any system resources associated
-   * with it. If the stream is already closed then invoking this
-   * method has no effect.
-   * <p/>
-   * <p> As noted in {@link AutoCloseable#close()}, cases where the
-   * close may fail require careful attention. It is strongly advised
-   * to relinquish the underlying resources and to internally
-   * <em>mark</em> the {@code Closeable} as closed, prior to throwing
-   * the {@code IOException}.
-   *
-   * @throws IOException if an I/O error occurs
-   */
-  @Override
-  public void close() throws IOException {
-    memoryMappedFile.close();
-  }
-
-  @Override
-  public void warmup() {
-    annBuf.load();
   }
 
   private class PQEntry implements Comparable<PQEntry> {

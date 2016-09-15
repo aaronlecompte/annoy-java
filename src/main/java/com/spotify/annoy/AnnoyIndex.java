@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * AnnoyIndex interface, provided to aid with dependency injection in tests.
  */
-public interface AnnoyIndex extends Closeable{
+public interface AnnoyIndex {
   /**
    * Get the vector for a given node in the tree.
    * @param node  node index in the ANN tree
@@ -29,9 +29,4 @@ public interface AnnoyIndex extends Closeable{
    */
   List<Integer> getNearest(float[] queryVector, int nResults);
 
-  /**
-   * Warm up index by attempting to load byte
-   * buffer into physical RAM
-   */
-  void warmup();
 }
